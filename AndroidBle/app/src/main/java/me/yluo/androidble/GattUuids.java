@@ -5,10 +5,12 @@ import java.util.HashMap;
 /**
  * This class includes a small subset of standard GATT attributes for demonstration purposes.
  */
-public class SampleGattAttributes {
+public class GattUuids {
     private static HashMap<String, String> attributes = new HashMap();
     private static final String GNENERAL_END = "0000-1000-8000-00805f9b34fb";
     //https://www.bluetooth.com/specifications/gatt/characteristics
+    public static final String CUSTOM_SERVICE = "0000ffe0";
+    public static final String SERIAL_PORT = "0000ffe1";
 
     static {
         attributes.put("00001800", "通用接入规范");//Generic Access Profile
@@ -29,6 +31,9 @@ public class SampleGattAttributes {
         attributes.put("00002a05", "服务改变");//Service Changed
         attributes.put("00002a29", "Manufacturer Name String");
         attributes.put("00002a37", "Heart Rate Measurement");
+
+        attributes.put(CUSTOM_SERVICE,"自定义服务");
+        attributes.put(SERIAL_PORT,"串口(TX RX)");
     }
 
     public static String lookup(String uuid, String defaultName) {
