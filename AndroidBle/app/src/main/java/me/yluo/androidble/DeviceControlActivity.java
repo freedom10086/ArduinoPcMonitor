@@ -1,6 +1,8 @@
 package me.yluo.androidble;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.content.BroadcastReceiver;
@@ -21,12 +23,14 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.TimePicker;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.UUID;
 
-public class DeviceControlActivity extends Activity {
+public class DeviceControlActivity extends Activity implements View.OnClickListener {
     private final static String TAG = DeviceControlActivity.class.getSimpleName();
     public static final String EXTRAS_DEVICE_NAME = "DEVICE_NAME";
     public static final String EXTRAS_DEVICE_ADDRESS = "DEVICE_ADDRESS";
@@ -65,11 +69,11 @@ public class DeviceControlActivity extends Activity {
             final String action = intent.getAction();
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 mConnected = true;
-                updateConnectionState(R.string.connected);
+                updateConnectionState(true);
                 invalidateOptionsMenu();
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
-                updateConnectionState(R.string.disconnected);
+                updateConnectionState(false);
                 invalidateOptionsMenu();
                 listDatas.clear();
                 gattServiceAdapter.notifyDataSetChanged();
@@ -90,9 +94,13 @@ public class DeviceControlActivity extends Activity {
         final Intent intent = getIntent();
         mDeviceName = intent.getStringExtra(EXTRAS_DEVICE_NAME);
         mDeviceAddress = intent.getStringExtra(EXTRAS_DEVICE_ADDRESS);
-        ((TextView) findViewById(R.id.device_address)).setText(mDeviceAddress);
+        ((TextView) findViewById(R.id.device_address)).setText("设备MAC: " + mDeviceAddress);
+        ((TextView) findViewById(R.id.device_name)).setText("设备名称: " + mDeviceName);
+        findViewById(R.id.btn_set_time).setOnClickListener(this);
+        findViewById(R.id.btn_set_date).setOnClickListener(this);
+        findViewById(R.id.btn_rgb_advance).setOnClickListener(this);
         ListView mGattServicesList = (ListView) findViewById(R.id.gatt_services_list);
-        mConnectionState = (TextView) findViewById(R.id.connection_state);
+        mConnectionState = (TextView) findViewById(R.id.device_connect_state);
         mDataField = (TextView) findViewById(R.id.data_value);
 
         gattServiceAdapter = new MyServiceAdaper();
@@ -151,11 +159,11 @@ public class DeviceControlActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void updateConnectionState(final int resourceId) {
+    private void updateConnectionState(final boolean isConnected) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mConnectionState.setText(resourceId);
+                mConnectionState.setText("连接状态: " + (isConnected ? "connected" : "disconnect"));
             }
         });
     }
@@ -173,6 +181,26 @@ public class DeviceControlActivity extends Activity {
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
         return intentFilter;
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.btn_set_time:
+                TimePickerDialog timePickerDialog = new TimePickerDialog(this, null, 10, 0, true);
+                timePickerDialog.show();
+                break;
+            case R.id.btn_set_date:
+                final Calendar mCalendar = Calendar.getInstance();
+                //sunday 1
+                int week = mCalendar.get(Calendar.DAY_OF_WEEK);
+                DatePickerDialog datePickerDialog = new DatePickerDialog(this, null,
+                        mCalendar.get(Calendar.YEAR), mCalendar.get(Calendar.MONTH), mCalendar.get(Calendar.DAY_OF_MONTH));
+                datePickerDialog.show();
+                break;
+            case R.id.btn_rgb_advance:
+                startActivityForResult(new Intent(this, ColorPickerActivity.class), -1);
+        }
     }
 
     private class MyDataItem {
@@ -295,4 +323,5 @@ public class DeviceControlActivity extends Activity {
             }
         }
     }
+
 }

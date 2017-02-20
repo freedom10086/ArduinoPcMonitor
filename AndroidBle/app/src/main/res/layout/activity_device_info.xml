@@ -1,61 +1,232 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/mac_label"
-        android:layout_width="wrap_content"
+    <android.support.v7.widget.CardView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/label_device_address"
-        android:textColor="@android:color/primary_text_light"
-        android:textSize="18sp" />
+        android:layout_margin="12dp"
+        android:elevation="4dp"
+        app:cardCornerRadius="2dp">
 
-    <TextView
-        android:id="@+id/device_address"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/mac_label"
-        android:layout_marginStart="4dp"
-        android:layout_toEndOf="@+id/mac_label"
-        android:text="12:34:56:78"
-        android:textSize="18sp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:orientation="vertical"
+            android:padding="12dp">
 
-    <TextView
-        android:id="@+id/state_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/mac_label"
-        android:text="@string/label_state"
-        android:textColor="@android:color/primary_text_light"
-        android:textSize="18sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="设备信息"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="16sp" />
 
-    <TextView
-        android:id="@+id/connection_state"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/state_label"
-        android:layout_marginStart="4dp"
-        android:layout_toEndOf="@+id/state_label"
-        android:text="@string/disconnected"
-        android:textSize="18sp" />
+            <TextView
+                android:id="@+id/device_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="设备名称: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
 
-    <TextView
-        android:id="@+id/data_label"
-        android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/device_address"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="设备MAC: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/device_connect_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="连接状态: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+    </android.support.v7.widget.CardView>
+
+    <android.support.v7.widget.CardView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/state_label"
-        android:text="@string/label_data"
-        android:textColor="@android:color/primary_text_light"
-        android:textSize="18sp" />
+        android:layout_marginEnd="12dp"
+        android:layout_marginStart="12dp"
+        android:elevation="4dp"
+        app:cardCornerRadius="2dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/sensor_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="传感器信息"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/device_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/sensor_info"
+                android:layout_marginTop="6dp"
+                android:text="设备时间: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/device_temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/device_time"
+                android:layout_marginTop="4dp"
+                android:text="温度: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/device_hum"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/device_temp"
+                android:layout_marginTop="4dp"
+                android:text="湿度: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btn_set_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/device_hum"
+                android:layout_marginTop="4dp"
+                android:layout_toStartOf="@+id/btn_set_time"
+                android:background="?android:selectableItemBackground"
+                android:clickable="true"
+                android:padding="8dp"
+                android:text="设置日期"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btn_set_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/device_hum"
+                android:layout_marginTop="4dp"
+                android:layout_toStartOf="@+id/btn_sync_time"
+                android:background="?android:selectableItemBackground"
+                android:clickable="true"
+                android:padding="8dp"
+                android:text="设置时间"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btn_sync_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_below="@+id/device_hum"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="4dp"
+                android:background="?android:selectableItemBackground"
+                android:clickable="true"
+                android:padding="8dp"
+                android:text="同步时间"
+                android:textColor="@color/colorPrimary"
+                android:textSize="14sp" />
+        </RelativeLayout>
+
+    </android.support.v7.widget.CardView>
+
+    <android.support.v7.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:elevation="4dp"
+        app:cardCornerRadius="2dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/rgb_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="信仰灯"
+                android:textColor="?android:textColorSecondary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/device_rgb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/rgb_info"
+                android:layout_marginTop="6dp"
+                android:text="状态: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+            <Switch
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_below="@+id/rgb_info" />
+
+
+            <TextView
+                android:id="@+id/device_rgb_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/device_rgb"
+                android:layout_marginTop="4dp"
+                android:text="颜色值: --"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="14sp" />
+
+
+            <TextView
+                android:id="@+id/btn_rgb_advance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_below="@+id/device_rgb_value"
+                android:layout_marginTop="4dp"
+                android:background="?android:selectableItemBackground"
+                android:clickable="true"
+                android:padding="8dp"
+                android:text="高级设置"
+                android:textColor="@color/colorPrimary"
+                android:textSize="14sp" />
+        </RelativeLayout>
+
+    </android.support.v7.widget.CardView>
 
     <TextView
         android:id="@+id/data_value"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/data_label"
         android:layout_marginStart="4dp"
-        android:layout_toEndOf="@+id/data_label"
         android:text="@string/no_data"
         android:textSize="18sp" />
 
@@ -63,6 +234,5 @@
         android:id="@+id/gatt_services_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/data_label"
-        android:layout_marginTop="8dp"/>
-</RelativeLayout>
+        android:layout_marginTop="8dp" />
+</LinearLayout>
