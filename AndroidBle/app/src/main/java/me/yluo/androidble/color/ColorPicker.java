@@ -22,8 +22,6 @@ public class ColorPicker extends View {
     private Paint mColorWheelPaint;
     private Paint mPointerHaloPaint;
     private Paint mPointPaint;
-    private Paint mCenterPointPaint;
-
 
     private int colorWheelWidth;
     private int colorWheelRadius;
@@ -33,33 +31,33 @@ public class ColorPicker extends View {
     private int pointRadius;
     private int centerPointRadius;
     private boolean mUserIsMovingPointer = false;
-    private int mColor;
-    private int centerColor;
+    private int mColor, mOldColor;
     private float mTranslationOffset;
     private float mSlopX;
     private float mSlopY;
     private float mAngle;
+    private ColorChangeListener colorChangeListener;
 
-    private ArgbBar mArgbBar = null;
+    private RgbBar mArgbBar = null;
 
     public ColorPicker(Context context) {
         super(context);
-        init(null, 0);
+        init();
     }
 
     public ColorPicker(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init(attrs, 0);
+        init();
     }
 
     public ColorPicker(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        init(attrs, defStyle);
+        init();
     }
 
 
-    private void init(AttributeSet attrs, int defStyle) {
-        mAngle = (float) (-Math.PI / 2);
+    private void init() {
+        setColor(0xff39c5bb);
         Shader s = new SweepGradient(0, 0, COLORS, null);
         mColorWheelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mColorWheelPaint.setShader(s);
@@ -71,12 +69,8 @@ public class ColorPicker extends View {
         mPointerHaloPaint.setAlpha(0x50);
 
         mPointPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mPointPaint.setColor(calculateColor(mAngle));
-        centerColor = calculateColor(mAngle);
-
-        mCenterPointPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mCenterPointPaint.setColor(calculateColor(mAngle));
-        mCenterPointPaint.setStyle(Paint.Style.FILL);
+        mPointPaint.setColor(angleToColor(mAngle));
+        mPointPaint.setStyle(Paint.Style.FILL);
     }
 
 
@@ -125,12 +119,20 @@ public class ColorPicker extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        if (mColor != mOldColor) {
+            mOldColor = mColor;
+            if (colorChangeListener != null) {
+                colorChangeListener.onColorChange(mColor);
+            }
+        }
+        mPointPaint.setColor(mColor);
         canvas.translate(mTranslationOffset, mTranslationOffset);
         canvas.drawOval(mColorWheelRectangle, mColorWheelPaint);
         float[] pointerPosition = calculatePointerPosition(mAngle);
         canvas.drawCircle(pointerPosition[0], pointerPosition[1], pointRadius + 15, mPointerHaloPaint);
+
         canvas.drawCircle(pointerPosition[0], pointerPosition[1], pointRadius, mPointPaint);
-        canvas.drawArc(mCenterRectangle, 0, 360, true, mCenterPointPaint);
+        canvas.drawArc(mCenterRectangle, 0, 360, true, mPointPaint);
     }
 
 
@@ -138,7 +140,70 @@ public class ColorPicker extends View {
         return s + Math.round(p * (d - s));
     }
 
-    private int calculateColor(float angle) {
+    public int getColor() {
+        return mColor;
+    }
+
+    public void setColor(int color) {
+        mColor = color|0xff000000;
+        mAngle = colorToAngle(mColor);
+        changeArgbBarColor(mColor);
+        invalidate();
+    }
+
+    public void setColorChangeListener(ColorChangeListener colorChangeListener) {
+        this.colorChangeListener = colorChangeListener;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        getParent().requestDisallowInterceptTouchEvent(true);
+        float x = event.getX() - mTranslationOffset;
+        float y = event.getY() - mTranslationOffset;
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                // Check whether the user pressed on the pointer.
+                float[] pointerPosition = calculatePointerPosition(mAngle);
+                int len = pointRadius + pointHoloWidth;
+                if (x >= (pointerPosition[0] - len) && x <= (pointerPosition[0] + len)
+                        && y >= (pointerPosition[1] - len) && y <= (pointerPosition[1] + len)) {
+                    mSlopX = x - pointerPosition[0];
+                    mSlopY = y - pointerPosition[1];
+                    mUserIsMovingPointer = true;
+                    invalidate();
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (mUserIsMovingPointer) {
+                    mAngle = (float) Math.atan2(y - mSlopY, x - mSlopX);
+                    mColor = angleToColor(mAngle);
+                    invalidate();
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                mUserIsMovingPointer = false;
+                invalidate();
+                break;
+        }
+
+        changeArgbBarColor(mColor);
+        return true;
+    }
+
+    private float[] calculatePointerPosition(float angle) {
+        float x = (float) (colorWheelRadius * Math.cos(angle));
+        float y = (float) (colorWheelRadius * Math.sin(angle));
+        return new float[]{x, y};
+    }
+
+    private float colorToAngle(int color) {
+        float[] colors = new float[3];
+        Color.colorToHSV(color, colors);
+        return (float) Math.toRadians(-colors[0]);
+    }
+
+    private int angleToColor(float angle) {
         float unit = (float) (angle / (2 * Math.PI));
         if (unit < 0) {
             unit += 1;
@@ -165,95 +230,20 @@ public class ColorPicker extends View {
         return Color.argb(a, r, g, b);
     }
 
-    public int getColor() {
-        return centerColor;
-    }
 
-    public void setColor(int color) {
-        mAngle = colorToAngle(color);
-        mPointPaint.setColor(color);
-        mCenterPointPaint.setColor(color);
-        changeOpacityBarColor(color);
-    }
-
-    private float colorToAngle(int color) {
-        float[] colors = new float[3];
-        Color.colorToHSV(color, colors);
-        return (float) Math.toRadians(-colors[0]);
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        getParent().requestDisallowInterceptTouchEvent(true);
-        float x = event.getX() - mTranslationOffset;
-        float y = event.getY() - mTranslationOffset;
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                // Check whether the user pressed on the pointer.
-                float[] pointerPosition = calculatePointerPosition(mAngle);
-                int len = pointRadius + pointHoloWidth;
-                if (x >= (pointerPosition[0] - len) && x <= (pointerPosition[0] + len)
-                        && y >= (pointerPosition[1] - len) && y <= (pointerPosition[1] + len)) {
-                    mSlopX = x - pointerPosition[0];
-                    mSlopY = y - pointerPosition[1];
-                    mUserIsMovingPointer = true;
-                    invalidate();
-                }
-                // Check whether the user pressed anywhere on the wheel.
-                else if (Math.sqrt(x * x + y * y) <= colorWheelRadius + len
-                        && Math.sqrt(x * x + y * y) >= colorWheelRadius - len) {
-                    mUserIsMovingPointer = true;
-                    invalidate();
-                }
-                // If user did not press pointer or center, report event not handled
-                else {
-                    getParent().requestDisallowInterceptTouchEvent(false);
-                    return false;
-                }
-                break;
-            case MotionEvent.ACTION_MOVE:
-                if (mUserIsMovingPointer) {
-                    mAngle = (float) Math.atan2(y - mSlopY, x - mSlopX);
-                    mPointPaint.setColor(calculateColor(mAngle));
-                    mCenterPointPaint.setColor(calculateColor(mAngle));
-                    invalidate();
-                }
-                // If user did not press pointer or center, report event not handled
-                else {
-                    getParent().requestDisallowInterceptTouchEvent(false);
-                    return false;
-                }
-                break;
-            case MotionEvent.ACTION_UP:
-                mUserIsMovingPointer = false;
-
-                invalidate();
-                break;
-            case MotionEvent.ACTION_CANCEL:
-                break;
-        }
-        changeOpacityBarColor(mColor);
-        return true;
-    }
-
-    private float[] calculatePointerPosition(float angle) {
-        float x = (float) (colorWheelRadius * Math.cos(angle));
-        float y = (float) (colorWheelRadius * Math.sin(angle));
-
-        return new float[]{x, y};
-    }
-
-
-    public void addArgbBar(ArgbBar bar) {
+    public void addArgbBar(RgbBar bar) {
         mArgbBar = bar;
-        // Give an instance of the color picker to the Opacity bar.
         mArgbBar.setColorPicker(this);
         mArgbBar.setColor(mColor);
     }
 
-    public void changeOpacityBarColor(int color) {
+    public void changeArgbBarColor(int color) {
         if (mArgbBar != null && mArgbBar.getColor() != color) {
             mArgbBar.setColor(color);
         }
+    }
+
+    public interface ColorChangeListener {
+        void onColorChange(int color);
     }
 }

@@ -13,7 +13,7 @@
     <GridView
         android:id="@+id/commons_colors"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="wrap_content"
         android:numColumns="6"
         android:scrollbars="none"
         android:verticalSpacing="12dp" />
@@ -22,10 +22,12 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp">
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="16进制：" />
+
         <EditText
             android:id="@+id/et_color_hex"
             android:layout_width="0.0dip"
@@ -59,13 +61,13 @@
 
     <me.yluo.androidble.color.ColorPicker
         android:id="@+id/picker"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="12dp" />
 
 
-    <me.yluo.androidble.color.ArgbBar
+    <me.yluo.androidble.color.RgbBar
         android:id="@+id/opacitybar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

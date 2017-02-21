@@ -12,6 +12,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
@@ -194,6 +195,44 @@ public class BluetoothLeService extends Service {
             return;
         }
         mBluetoothGatt.disconnect();
+    }
+
+    public void setRgb(int color) {
+        int r = Color.red(color);
+        int g = Color.green(color);
+        int b = Color.blue(color);
+        Log.d(TAG, "set rgb " + r + " " + g + " " + b);
+        setData("102 " + r + " " + g + " " + b + "\n");
+    }
+
+    public void setRgbState(boolean isOpen) {
+        if (isOpen) {
+            setData("102 255 255 255\n");
+        } else {
+            setData("102 0 0 0\n");
+        }
+    }
+
+    private void setData(String data) {
+        Log.d(TAG, "write data to ble :" + data);
+        BluetoothGattCharacteristic serial = getTxCharacteristic();
+        if (serial == null) return;
+        setCharacteristicNotification(serial, true);
+        serial.setValue(data);
+        mBluetoothGatt.writeCharacteristic(serial);
+        readCharacteristic(serial);
+    }
+
+    private BluetoothGattCharacteristic getTxCharacteristic() {
+        for (BluetoothGattService s : getSupportedGattServices()) {
+            for (BluetoothGattCharacteristic c : s.getCharacteristics()) {
+                if (c.getUuid().toString().startsWith(GattUuids.SERIAL_PORT)) {
+                    return c;
+                }
+            }
+        }
+
+        return null;
     }
 
     public void readCharacteristic(BluetoothGattCharacteristic characteristic) {

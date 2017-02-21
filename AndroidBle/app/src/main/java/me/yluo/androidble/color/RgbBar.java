@@ -13,7 +13,7 @@ import android.view.View;
 import me.yluo.androidble.Utils;
 
 
-public class ArgbBar extends View {
+public class RgbBar extends View {
     private int barWidth;
     private int mBarLength;
     private int mBarPointerRadius;
@@ -26,17 +26,17 @@ public class ArgbBar extends View {
 
     private ColorPicker mPicker = null;
 
-    public ArgbBar(Context context) {
+    public RgbBar(Context context) {
         super(context);
         init(null, 0);
     }
 
-    public ArgbBar(Context context, AttributeSet attrs) {
+    public RgbBar(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(attrs, 0);
     }
 
-    public ArgbBar(Context context, AttributeSet attrs, int defStyle) {
+    public RgbBar(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         init(attrs, defStyle);
     }
@@ -66,8 +66,8 @@ public class ArgbBar extends View {
         }
 
         height = Math.min(minHeight, height);
-        barWidth = Utils.dp2px(getContext(), 6);
-        mBarPointerRadius = Utils.dp2px(getContext(), 8);
+        barWidth = Utils.dp2px(getContext(), 7);
+        mBarPointerRadius = Utils.dp2px(getContext(), 7);
         pointerHoloR = mBarPointerRadius + Utils.dp2px(getContext(), 4);
         mBarLength = width - pointerHoloR * 2;
         setMeasuredDimension(width, height);
@@ -77,8 +77,8 @@ public class ArgbBar extends View {
     protected void onDraw(Canvas canvas) {
         int len = getHeight() / 8;
         int cx, cy;
-        for (int i = 0; i < 4; i++) {
-            cx = (int) (pointerHoloR + ((mColor >> ((3 - i) * 8)) & 0xff) * 1.0f / 255 * mBarLength);
+        for (int i = 0; i < 3; i++) {
+            cx = (int) (pointerHoloR + ((mColor >> ((2 - i) * 8)) & 0xff) * 1.0f / 255 * mBarLength);
             if (cx > pointerHoloR + mBarLength) cx = pointerHoloR + mBarLength;
             cy = (2 * i + 1) * len;
             mBarPaint.setShader(shaderARGB[i]);
@@ -101,10 +101,10 @@ public class ArgbBar extends View {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 boolean isok = false;
-                if (x >= 0 && x <= mBarLength + pointerHoloR) {
-                    for (int i = 0; i < 4; i++) {
+                if (x >= 0 && x <= mBarLength + pointerHoloR + 8) {
+                    for (int i = 0; i < 3; i++) {
                         int cy = (2 * i + 1) * len;
-                        if (y >= (cy - pointerHoloR) && y <= cy + pointerHoloR) {
+                        if (y >= (cy - pointerHoloR - 8) && y <= cy + pointerHoloR + 8) {
                             barMove(i, Math.round(x));
                             mIsMovingPointer = true;
                             moveItem = i;
@@ -135,17 +135,14 @@ public class ArgbBar extends View {
     private void barMove(int witch, int position) {
         int value = getValue(position);
         switch (witch) {
-            case 0://a
-                mColor = Color.argb(value, Color.red(mColor), Color.green(mColor), Color.blue(mColor));
+            case 0://r
+                mColor = Color.argb(255, value, Color.green(mColor), Color.blue(mColor));
                 break;
-            case 1://r
-                mColor = Color.argb(Color.alpha(mColor), value, Color.green(mColor), Color.blue(mColor));
+            case 1://g
+                mColor = Color.argb(255, Color.red(mColor), value, Color.blue(mColor));
                 break;
-            case 2://g
-                mColor = Color.argb(Color.alpha(mColor), Color.red(mColor), value, Color.blue(mColor));
-                break;
-            case 3://b
-                mColor = Color.argb(Color.alpha(mColor), Color.red(mColor), Color.green(mColor), value);
+            case 2://b
+                mColor = Color.argb(255, Color.red(mColor), Color.green(mColor), value);
                 break;
         }
 
@@ -167,16 +164,17 @@ public class ArgbBar extends View {
         //if (color == mColor) return;
         mColor = color;
         shaderARGB[0] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
-                new int[]{color & 0x00ffffff, color | 0xff000000}, null, Shader.TileMode.CLAMP);
-        shaderARGB[1] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
                 new int[]{color & 0xff00ffff, color | 0x00ff0000}, null, Shader.TileMode.CLAMP);
-        shaderARGB[2] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
+        shaderARGB[1] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
                 new int[]{color & 0xffff00ff, color | 0x0000ff00}, null, Shader.TileMode.CLAMP);
-        shaderARGB[3] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
+        shaderARGB[2] = new LinearGradient(pointerHoloR, 0, mBarLength + pointerHoloR, barWidth,
                 new int[]{color & 0xffffff00, color | 0x000000ff}, null, Shader.TileMode.CLAMP);
+
         if (mPicker != null && mPicker.getColor() != mColor) {
             mPicker.setColor(mColor);
         }
+
+        setPickerColor(mColor);
         invalidate();
 
     }
@@ -187,5 +185,11 @@ public class ArgbBar extends View {
 
     public void setColorPicker(ColorPicker picker) {
         mPicker = picker;
+    }
+
+    private void setPickerColor(int color) {
+        if (mPicker != null && mPicker.getColor() != color) {
+            mPicker.setColor(color);
+        }
     }
 }

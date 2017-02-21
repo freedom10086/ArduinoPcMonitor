@@ -21,16 +21,17 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.CompoundButton;
 import android.widget.ListView;
+import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.TimePicker;
 
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.UUID;
 
-public class DeviceControlActivity extends Activity implements View.OnClickListener {
+public class DeviceControlActivity extends Activity implements View.OnClickListener, CompoundButton.OnCheckedChangeListener {
     private final static String TAG = DeviceControlActivity.class.getSimpleName();
     public static final String EXTRAS_DEVICE_NAME = "DEVICE_NAME";
     public static final String EXTRAS_DEVICE_ADDRESS = "DEVICE_ADDRESS";
@@ -41,6 +42,7 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
     private String mDeviceAddress;
     private BluetoothLeService mBluetoothLeService;
     private List<MyDataItem> listDatas = new ArrayList<>();
+    private Switch ledSwitch;
 
     private boolean mConnected = false;
     private BluetoothGattCharacteristic mNotifyCharacteristic;
@@ -99,9 +101,11 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
         findViewById(R.id.btn_set_time).setOnClickListener(this);
         findViewById(R.id.btn_set_date).setOnClickListener(this);
         findViewById(R.id.btn_rgb_advance).setOnClickListener(this);
+        ledSwitch = (Switch) findViewById(R.id.device_led_switch);
         ListView mGattServicesList = (ListView) findViewById(R.id.gatt_services_list);
         mConnectionState = (TextView) findViewById(R.id.device_connect_state);
         mDataField = (TextView) findViewById(R.id.data_value);
+        ledSwitch.setOnCheckedChangeListener(this);
 
         gattServiceAdapter = new MyServiceAdaper();
         mGattServicesList.setOnItemClickListener(gattServiceAdapter);
@@ -174,6 +178,18 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
         }
     }
 
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == ColorPickerActivity.COLOR_RESULT) {
+            int color = data.getIntExtra(ColorPickerActivity.COLOR_KEY, -1);
+            if (color != -1) {
+                mBluetoothLeService.setRgb(color);
+            }
+        }
+    }
+
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
@@ -199,8 +215,15 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
                 datePickerDialog.show();
                 break;
             case R.id.btn_rgb_advance:
-                startActivityForResult(new Intent(this, ColorPickerActivity.class), -1);
+                startActivityForResult(new Intent(this, ColorPickerActivity.class), ColorPickerActivity.COLOR_REQUEST);
+                break;
         }
+    }
+
+    //led 开关变化
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        mBluetoothLeService.setRgbState(isChecked);
     }
 
     private class MyDataItem {

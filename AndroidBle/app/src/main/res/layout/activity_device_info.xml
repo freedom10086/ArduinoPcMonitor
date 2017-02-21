@@ -188,6 +188,7 @@
                 android:textSize="14sp" />
 
             <Switch
+                android:id="@+id/device_led_switch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
