@@ -115,9 +115,6 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
     private void updateConnectionState(final boolean isConnected) {
         runOnUiThread(() -> {
             mConnectionState.setText("连接状态: " + (isConnected ? "connected" : "disconnect"));
-            if (isConnected) {
-                mBluetoothLeService.loadRgb();
-            }
         });
     }
 
@@ -130,7 +127,10 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
 
     //从arduino端口获得数据
     private void pullData() {
-
+        System.out.println("====pullData====");
+        mBluetoothLeService.sendData(DataType.SHOW_RGB, DataType.SHOW_RGB.toString());
+        mBluetoothLeService.sendData(DataType.SHOW_SENSOR, DataType.SHOW_SENSOR.toString());
+        mBluetoothLeService.sendData(DataType.SHOW_TIME, DataType.SHOW_TIME.toString());
     }
 
     @Override
@@ -164,7 +164,7 @@ public class DeviceControlActivity extends Activity implements View.OnClickListe
             case R.id.send_btn:
                 String s = input.getText().toString().trim();
                 if (!TextUtils.isEmpty(s)) {
-                    mBluetoothLeService.sendData(s);
+                    mBluetoothLeService.sendData(DataType.CUSTOM, s);
                 }
                 input.setText(null);
                 break;

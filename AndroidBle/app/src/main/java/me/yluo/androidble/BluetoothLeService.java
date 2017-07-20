@@ -16,6 +16,8 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.util.ArrayDeque;
+import java.util.Queue;
 import java.util.Stack;
 import java.util.UUID;
 
@@ -24,13 +26,15 @@ public class BluetoothLeService extends Service {
     private final static String TAG = BluetoothLeService.class.getSimpleName();
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
+    BluetoothGattCharacteristic serialCharacteristic;
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
-    private Stack<DataType> requests = new Stack<>(); //请求操作的顺序
+    private Queue<SendData> sendQueue = new ArrayDeque<>(16);
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
+    private boolean sending = false; // 正在发送
 
     public final static String ACTION_GATT_CONNECTED = "yluo.me.ble.ACTION_GATT_CONNECTED";
     public final static String ACTION_GATT_DISCONNECTED = "yluo.me.ble.ACTION_GATT_DISCONNECTED";
@@ -63,8 +67,17 @@ public class BluetoothLeService extends Service {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             //这个函数调用过后才能发 数据
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                String intentAction = ACTION_GATT_CONNECTED;
-                broadcastUpdate(intentAction);
+                BluetoothGattService service = mBluetoothGatt.getService(UUID_SERIAL_SERVICE);
+                if (service != null) {
+                    serialCharacteristic = service.getCharacteristic(UUID_SERIAL_Characteristic);
+                    if (serialCharacteristic != null) {
+                        mBluetoothGatt.setCharacteristicNotification(serialCharacteristic, true);
+                    }
+                }
+
+                final Intent intent = new Intent(ACTION_SERVICE_DISCOVERED);
+                intent.putExtra(EXTRA_DATA, serialCharacteristic != null); //true 可以发送
+                sendBroadcast(intent);
             }
         }
 
@@ -74,11 +87,17 @@ public class BluetoothLeService extends Service {
             String name = GattUuids.lookup(characteristic.getUuid().toString(), "NAN Characteristic");
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.i(TAG, "onCharacteristicWrite success " + name);
-                if (nextSendLen > 0) { //分包的情况
+                if (sendQueue.peek().haveMoreData()) { //包还没发完
                     Log.i(TAG, "send next packet");
-                    sendData(new String(nextSend, 0, nextSendLen));
+                    writeData(sendQueue.peek().getData());
+                } else {
+                    sendQueue.poll();//出队
+                    if (sendQueue.size() > 0) {//还有数据 继续
+                        writeData(sendQueue.peek().getData());
+                    } else {
+                        sending = false;
+                    }
                 }
-
             } else {
                 Log.w(TAG, "onCharacteristicWrite fail" + name);
             }
@@ -218,8 +237,7 @@ public class BluetoothLeService extends Service {
         if (year < 100 && year > 0 && month > 0 && month < 13 && day > 0 && day < 32 &&
                 week > 0 && week < 8 && hour >= 0 && hour < 25 && minute >= 0 && minute < 61
                 && second >= 0 && second < 61) {
-            requests.push(DataType.SET_TIME);
-            sendData("100" + " " + year + " " + month + " " + day + " " +
+            sendData(DataType.SET_TIME, "100" + " " + year + " " + month + " " + day + " " +
                     week + " " + hour + " " + minute + " " + second);
         } else {
             throw new IllegalArgumentException("时间格式错误.");
@@ -231,54 +249,33 @@ public class BluetoothLeService extends Service {
         int g = Color.green(color);
         int b = Color.blue(color);
         Log.d(TAG, "set rgb " + r + " " + g + " " + b);
-        requests.push(DataType.SET_RGB);
-        sendData(DataType.SET_RGB.toString() + " " + r + " " + g + " " + b);
+        sendData(DataType.SET_RGB, DataType.SET_RGB.toString() + " " + r + " " + g + " " + b);
     }
 
-    public void loadTime() {
-        requests.push(DataType.SHOW_TIME);
-        sendData(DataType.SHOW_TIME.toString());
-    }
 
-    public void loadRgb() {
-        requests.push(DataType.SHOW_RGB);
-        sendData(DataType.SHOW_RGB.toString());
-    }
+    public boolean sendData(DataType type, String data) {
+        if (serialCharacteristic == null) return false;
 
-    public void loadSensor() {
-        requests.push(DataType.SHOW_SENSOR);
-        sendData(DataType.SHOW_SENSOR.toString());
-    }
-
-    //下一次发送的数据 协议限制一次只能20字节
-    private byte[] nextSend = new byte[20];
-    private int nextSendLen = 0;
-
-    public void sendData(String data) {
         if (!data.endsWith("\n")) {
             data = data + "\n";
         }
-        Log.d(TAG, "write data to ble :" + data);
-        BluetoothGattService service = mBluetoothGatt.getService(UUID_SERIAL_SERVICE);
-        if (service == null) return;
-        BluetoothGattCharacteristic characteristic = service.getCharacteristic(UUID_SERIAL_Characteristic);
-        if (characteristic == null) return;
 
-        Log.d(TAG, "characteristic founded can white");
-        mBluetoothGatt.setCharacteristicNotification(characteristic, true);
-        if (data.getBytes().length > 20) { //太长了一次发不走
-            byte[] b = new byte[20];
-            System.arraycopy(data.getBytes(), 0, b, 0, 20);
-            characteristic.setValue(b);
-            nextSendLen = data.getBytes().length - 20;
-            System.arraycopy(data.getBytes(), 20, nextSend, 0, nextSendLen);
-        } else {
-            characteristic.setValue(data);
-            nextSendLen = 0;
+
+        sendQueue.add(new SendData(type, data));
+        if (!sending) { //没在发送
+            byte[] b = sendQueue.peek().getData();
+            writeData(b);
         }
+        //正在发送
+        return true;
+    }
 
-        characteristic.setValue(data);
-        mBluetoothGatt.writeCharacteristic(characteristic);
-        mBluetoothGatt.readCharacteristic(characteristic);
+    //真正的写数据
+    private void writeData(byte[] data) {
+        sending = true;
+        Log.d(TAG, "write data to ble :" + new String(data));
+        serialCharacteristic.setValue(data);
+        mBluetoothGatt.writeCharacteristic(serialCharacteristic);
+        mBluetoothGatt.readCharacteristic(serialCharacteristic);
     }
 }
