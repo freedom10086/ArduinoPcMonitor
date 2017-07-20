@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -17,32 +16,31 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
-import java.util.List;
+import java.util.Stack;
 import java.util.UUID;
 
 
 public class BluetoothLeService extends Service {
     private final static String TAG = BluetoothLeService.class.getSimpleName();
-    public static String HEART_RATE_MEASUREMENT = "00002a37-0000-1000-8000-00805f9b34fb";
-    public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
-
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
-
+    private Stack<DataType> requests = new Stack<>(); //请求操作的顺序
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
 
-    public final static String ACTION_GATT_CONNECTED = "yluo.me.ACTION_GATT_CONNECTED";
-    public final static String ACTION_GATT_DISCONNECTED = "yluo.me.ACTION_GATT_DISCONNECTED";
-    public final static String ACTION_GATT_SERVICES_DISCOVERED = "yluo.me.ACTION_GATT_SERVICES_DISCOVERED";
-    public final static String ACTION_DATA_AVAILABLE = "yluo.me.ACTION_DATA_AVAILABLE";
-    public final static String EXTRA_DATA = "yluo.me.EXTRA_DATA";
+    public final static String ACTION_GATT_CONNECTED = "yluo.me.ble.ACTION_GATT_CONNECTED";
+    public final static String ACTION_GATT_DISCONNECTED = "yluo.me.ble.ACTION_GATT_DISCONNECTED";
+    public final static String ACTION_DATA_AVAILABLE = "yluo.me.ble.ACTION_DATA_AVAILABLE";
+    public final static String ACTION_SERVICE_DISCOVERED = "yluo.me.ble.ACTION_SERVICE_DISCOVERED";
+    public final static String EXTRA_DATA = "yluo.me.ble.EXTRA_DATA";
 
-    public final static UUID UUID_HEART_RATE_MEASUREMENT = UUID.fromString(HEART_RATE_MEASUREMENT);
+    public final static UUID UUID_SERIAL_SERVICE = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb");
+    public final static UUID UUID_SERIAL_Characteristic = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
+
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
@@ -52,8 +50,7 @@ public class BluetoothLeService extends Service {
                 intentAction = ACTION_GATT_CONNECTED;
                 mConnectionState = STATE_CONNECTED;
                 broadcastUpdate(intentAction);
-                Log.i(TAG, "Connected to GATT server.");
-                Log.i(TAG, "Attempting to start service discovery:" + mBluetoothGatt.discoverServices());
+                Log.i(TAG, "Connected to GATT Attempting to start service discovery:" + mBluetoothGatt.discoverServices());
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
@@ -64,23 +61,35 @@ public class BluetoothLeService extends Service {
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            //这个函数调用过后才能发 数据
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
-            } else {
-                Log.w(TAG, "onServicesDiscovered received: " + status);
+                String intentAction = ACTION_GATT_CONNECTED;
+                broadcastUpdate(intentAction);
             }
         }
 
         @Override
-        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            //写数据结果
+            String name = GattUuids.lookup(characteristic.getUuid().toString(), "NAN Characteristic");
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+                Log.i(TAG, "onCharacteristicWrite success " + name);
+                if (nextSendLen > 0) { //分包的情况
+                    Log.i(TAG, "send next packet");
+                    sendData(new String(nextSend, 0, nextSendLen));
+                }
+
+            } else {
+                Log.w(TAG, "onCharacteristicWrite fail" + name);
             }
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            //从串口读出消息
+            if (characteristic.getUuid().toString().equals(UUID_SERIAL_Characteristic.toString())) {
+                broadcastData(ACTION_DATA_AVAILABLE, characteristic.getValue());
+            }
         }
     };
 
@@ -89,32 +98,27 @@ public class BluetoothLeService extends Service {
         sendBroadcast(intent);
     }
 
-    private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
+    private byte[] tempData = new byte[2048];
+    private int position = 0;
+
+    private void broadcastData(final String action, final byte[] data) {
         final Intent intent = new Intent(action);
-        if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
-            int flag = characteristic.getProperties();
-            int format = -1;
-            if ((flag & 0x01) != 0) {
-                format = BluetoothGattCharacteristic.FORMAT_UINT16;
-                Log.d(TAG, "Heart rate format UINT16.");
-            } else {
-                format = BluetoothGattCharacteristic.FORMAT_UINT8;
-                Log.d(TAG, "Heart rate format UINT8.");
+        if (data != null && data.length > 1) {
+            if (position + data.length > tempData.length) {
+                //满了 直接丢弃
+                position = 0;
             }
-            final int heartRate = characteristic.getIntValue(format, 1);
-            Log.d(TAG, String.format("Received heart rate: %d", heartRate));
-            intent.putExtra(EXTRA_DATA, String.valueOf(heartRate));
-        } else {
-            // For all other profiles, writes the data formatted in HEX.
-            final byte[] data = characteristic.getValue();
-            if (data != null && data.length > 0) {
-                final StringBuilder stringBuilder = new StringBuilder(data.length);
-                for (byte byteChar : data)
-                    stringBuilder.append(String.format("%02X ", byteChar));
-                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
+
+            System.arraycopy(data, 0, tempData, position, data.length);
+            position += data.length;
+            if (tempData[position - 1] == 10 && tempData[position - 2] == 13) {//结尾
+                intent.putExtra(EXTRA_DATA, new String(tempData, 0, position - 2));
+                position = 0;
+                sendBroadcast(intent);
+            } else { //没有结束
+                //do nothing
             }
         }
-        sendBroadcast(intent);
     }
 
     public class LocalBinder extends Binder {
@@ -130,6 +134,7 @@ public class BluetoothLeService extends Service {
 
     @Override
     public boolean onUnbind(Intent intent) {
+        Log.i("BluetoothLeService", "onUnbind BluetoothGatt");
         if (mBluetoothGatt != null) {
             mBluetoothGatt.close();
             mBluetoothGatt = null;
@@ -157,6 +162,17 @@ public class BluetoothLeService extends Service {
         return true;
     }
 
+    @Override
+    public void onDestroy() {
+        Log.i("BluetoothLeService", "destroy BluetoothGatt");
+        if (mBluetoothGatt == null) {
+            return;
+        }
+        mBluetoothGatt.close();
+        mBluetoothGatt = null;
+        super.onDestroy();
+    }
+
     /**
      * Connects to the GATT server hosted on the Bluetooth LE device.
      */
@@ -165,6 +181,7 @@ public class BluetoothLeService extends Service {
             Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
             return false;
         }
+
         // Previously connected device.  Try to reconnect.
         if (mBluetoothDeviceAddress != null && address.equals(mBluetoothDeviceAddress) && mBluetoothGatt != null) {
             Log.d(TAG, "Trying to use an existing mBluetoothGatt for connection.");
@@ -190,11 +207,23 @@ public class BluetoothLeService extends Service {
     }
 
     public void disconnect() {
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized");
-            return;
+        if (mBluetoothGatt != null)
+            mBluetoothGatt.disconnect();
+    }
+
+    //year 0-99 month 1-12
+    //week 1-7
+    public void setTime(int year, int month, int day, int week,
+                        int hour, int minute, int second) {
+        if (year < 100 && year > 0 && month > 0 && month < 13 && day > 0 && day < 32 &&
+                week > 0 && week < 8 && hour >= 0 && hour < 25 && minute >= 0 && minute < 61
+                && second >= 0 && second < 61) {
+            requests.push(DataType.SET_TIME);
+            sendData("100" + " " + year + " " + month + " " + day + " " +
+                    week + " " + hour + " " + minute + " " + second);
+        } else {
+            throw new IllegalArgumentException("时间格式错误.");
         }
-        mBluetoothGatt.disconnect();
     }
 
     public void setRgb(int color) {
@@ -202,65 +231,54 @@ public class BluetoothLeService extends Service {
         int g = Color.green(color);
         int b = Color.blue(color);
         Log.d(TAG, "set rgb " + r + " " + g + " " + b);
-        setData("102 " + r + " " + g + " " + b + "\n");
+        requests.push(DataType.SET_RGB);
+        sendData(DataType.SET_RGB.toString() + " " + r + " " + g + " " + b);
     }
 
-    public void setRgbState(boolean isOpen) {
-        if (isOpen) {
-            setData("102 255 255 255\n");
-        } else {
-            setData("102 0 0 0\n");
+    public void loadTime() {
+        requests.push(DataType.SHOW_TIME);
+        sendData(DataType.SHOW_TIME.toString());
+    }
+
+    public void loadRgb() {
+        requests.push(DataType.SHOW_RGB);
+        sendData(DataType.SHOW_RGB.toString());
+    }
+
+    public void loadSensor() {
+        requests.push(DataType.SHOW_SENSOR);
+        sendData(DataType.SHOW_SENSOR.toString());
+    }
+
+    //下一次发送的数据 协议限制一次只能20字节
+    private byte[] nextSend = new byte[20];
+    private int nextSendLen = 0;
+
+    public void sendData(String data) {
+        if (!data.endsWith("\n")) {
+            data = data + "\n";
         }
-    }
-
-    private void setData(String data) {
         Log.d(TAG, "write data to ble :" + data);
-        BluetoothGattCharacteristic serial = getTxCharacteristic();
-        if (serial == null) return;
-        setCharacteristicNotification(serial, true);
-        serial.setValue(data);
-        mBluetoothGatt.writeCharacteristic(serial);
-        readCharacteristic(serial);
-    }
+        BluetoothGattService service = mBluetoothGatt.getService(UUID_SERIAL_SERVICE);
+        if (service == null) return;
+        BluetoothGattCharacteristic characteristic = service.getCharacteristic(UUID_SERIAL_Characteristic);
+        if (characteristic == null) return;
 
-    private BluetoothGattCharacteristic getTxCharacteristic() {
-        for (BluetoothGattService s : getSupportedGattServices()) {
-            for (BluetoothGattCharacteristic c : s.getCharacteristics()) {
-                if (c.getUuid().toString().startsWith(GattUuids.SERIAL_PORT)) {
-                    return c;
-                }
-            }
+        Log.d(TAG, "characteristic founded can white");
+        mBluetoothGatt.setCharacteristicNotification(characteristic, true);
+        if (data.getBytes().length > 20) { //太长了一次发不走
+            byte[] b = new byte[20];
+            System.arraycopy(data.getBytes(), 0, b, 0, 20);
+            characteristic.setValue(b);
+            nextSendLen = data.getBytes().length - 20;
+            System.arraycopy(data.getBytes(), 20, nextSend, 0, nextSendLen);
+        } else {
+            characteristic.setValue(data);
+            nextSendLen = 0;
         }
 
-        return null;
-    }
-
-    public void readCharacteristic(BluetoothGattCharacteristic characteristic) {
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized");
-            return;
-        }
+        characteristic.setValue(data);
+        mBluetoothGatt.writeCharacteristic(characteristic);
         mBluetoothGatt.readCharacteristic(characteristic);
-    }
-
-    /**
-     * Enables or disables notification on a give characteristic.
-     */
-    public void setCharacteristicNotification(BluetoothGattCharacteristic characteristic, boolean enabled) {
-        if (mBluetoothAdapter == null || mBluetoothGatt == null) {
-            Log.w(TAG, "BluetoothAdapter not initialized");
-            return;
-        }
-        mBluetoothGatt.setCharacteristicNotification(characteristic, enabled);
-        if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
-            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG));
-            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            mBluetoothGatt.writeDescriptor(descriptor);
-        }
-    }
-
-    public List<BluetoothGattService> getSupportedGattServices() {
-        if (mBluetoothGatt == null) return null;
-        return mBluetoothGatt.getServices();
     }
 }

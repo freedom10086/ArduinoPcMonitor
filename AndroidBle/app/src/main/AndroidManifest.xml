@@ -29,7 +29,7 @@
             android:name=".BluetoothLeService"
             android:enabled="true" />
 
-        <activity android:name=".ColorPickerActivity"></activity>
+        <activity android:name=".ColorPickerActivity" />
     </application>
 
 </manifest>
