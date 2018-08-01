@@ -20,3 +20,9 @@
 * OLED 数据 11 (MOSI),  13 (SCK)
 * DS3221 I2C: A4 (SDA) and A5 (SCL)
 * 蓝牙模块 --- 串口
+
+## 配套android app
+AndroidBle 项目支持设置事件，设置rgb灯的颜色
+
+## 成品
+--
